@@ -6,7 +6,7 @@ const deleteAnything = pathFor => {
     myFS.exists(pathFor)
         .then(baseOperations.scan)
         .then(baseOperations.remove)
-        .catch(e => console.error(e));
+        .catch(console.error);
 
 };
 
@@ -15,7 +15,7 @@ const copyDirectory = (input, output) => {
         .then(() => myFS.exists(input)) // ... и существует папка из которой копировать, только тогда продолжаем
         .then(baseOperations.scan)
         .then(baseOperations.copy(input, output))
-        .catch(e => console.error(e));
+        .catch(console.error);
 
 };
 
@@ -33,7 +33,7 @@ const distribute = (input, output, isDeleteInput = false) => {
             return baseOperations.distribute(input, output)({arrFiles, arrDirs});
         })
         .then(() => isDeleteInput && baseOperations.remove({arrFiles: filesArr, arrDirs: dirsArr}))
-        .catch(e => console.error(e));
+        .catch(console.error);
 };
 
 let [operation, input, output, isDeleteInput] = process.argv.slice(2);
