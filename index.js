@@ -16,6 +16,10 @@ const myFS = {
         fs.exists(pathFor, exists => exists ? resolve(pathFor) : reject(`директории ${pathFor} не существует`));
     }),
 
+    unexists: pathFor => new Promise((resolve, reject) => {
+        fs.exists(pathFor, exists => exists ? reject(`директория ${pathFor} уже существует`) : resolve(pathFor));
+    }),
+
     readdir: pathFor => new Promise((resolve, reject) => {
         fs.readdir(pathFor, (err, files) => {
             err && reject(err);
@@ -31,6 +35,14 @@ const myFS = {
         });
     }),
 
+    link: (pathFor, newPath) => new Promise((resolve, reject) => {
+        fs.link(pathFor, newPath, err => {
+            err && reject(err);
+            console.log(`файл ${pathFor} успешно скопирован`);
+            resolve();
+        });
+    }),
+
     rmdir: pathFor => new Promise((resolve, reject) => {
         fs.rmdir(pathFor, err => {
             err && reject(err);
@@ -39,8 +51,16 @@ const myFS = {
         });
     }),
 
+    mkdir: pathFor => new Promise((resolve, reject) => {
+        fs.mkdir(pathFor, err => {
+            err && reject(err);
+            console.log(`директория ${pathFor} успешно создана`);
+            resolve();
+        });
+    }),
+
     // сортирует по длинне. По логике самые глубокие директории, которые надо удалить, имеют самый длинный путь к файлу
-    sortPathForDir: (a, b) => a.length < b.length ?
+    ascendingSort: (a, b) => a.length < b.length ?
         1 :
         a.length > b.length ?
             -1 :
@@ -49,7 +69,8 @@ const myFS = {
 };
 
 const bigOperations = {
-    read (pathFor) {
+    scan (pathFor) {
+
         // Только сохраняет пути до всех файлов отдельно и папок отдельно
 
         return new Promise((resolve, reject) => {
@@ -59,7 +80,7 @@ const bigOperations = {
 
             // Функция завершения, уменьшает счетчик, когда счетчик будет равен 0, значит все функции чтения завершены,
             // все пути записаны в массивы и можно эти пути передать дальше
-            const endRead = ({arrFiles, arrDirs}) => !--count && resolve({arrFiles, arrDirs: arrDirs.sort(myFS.sortPathForDir)});
+            const endRead = ({arrFiles, arrDirs}) => !--count && resolve({arrFiles, arrDirs});
 
             let count = 0;
 
@@ -120,8 +141,12 @@ const bigOperations = {
             .all(arrFiles.map(files => myFS.unlink(files))) // Вначале удаляем все файлы
             .then(() => {
 
-                // Если есть массив папок (если удаляем файл, то и массива не будет)
+                // Если есть массив папок (если удаляем только файл, то и массива папок не будет)
                 if (arrDirs.length) {
+
+                    // сортирует по длинне. По логике самые глубокие директории, которые надо удалить, имеют самый длинный путь к файлу
+                    arrDirs = arrDirs.sort(myFS.ascendingSort);
+
                     // После чего последовательно удаляем каждую папку, начиная с самой глубокой
                     let promisesDirs = myFS.rmdir(arrDirs[0]);
                     arrDirs.forEach((dir, i) => {if (i) promisesDirs = promisesDirs.then(() => myFS.rmdir(dir))});
@@ -129,76 +154,80 @@ const bigOperations = {
                 }
             })
     },
+
+    copy (input, output) {
+        return ({arrFiles, arrDirs}) => {
+
+            // Если есть массив папок (если копируем только файл, то и массива папок не будет)
+            if (arrDirs.length) {
+
+                // Создаем новые пути для файлов
+                let newFiles = arrFiles.map(file => file.replace(input, output));
+
+                // Заменяем все пути папок на новые
+                arrDirs = arrDirs.map(dir => dir.replace(input, output)).sort(myFS.ascendingSort).reverse();
+
+                // После чего последовательно удаляем каждую папку, начиная с самой глубокой
+                let promisesDirs = myFS.mkdir(arrDirs[0]);
+                arrDirs.forEach((dir, i) => {if (i) promisesDirs = promisesDirs.then(() => myFS.mkdir(dir))});
+
+                // Когда все папки созданы, копируем все файлы, уже не важно в каком порядке
+                return promisesDirs.then(() => Promise.all(arrFiles.map((files, i) => myFS.link(files, newFiles[i]))))
+            }
+
+        }
+    },
+
+    distribute(input, output) {
+        return ({arrFiles}) => {
+
+            let namesFiles = arrFiles.map(file => file.split(path.sep).slice(-1)[0]);
+
+            let arrDirs = [...new Set(arrFiles.map((_, i) => path.join(output, namesFiles[i].charAt(0).toUpperCase())))].sort();
+
+            let fullNamesFiles = namesFiles.map(name => {
+                let firstLetter = name.charAt(0).toUpperCase();
+                let fullName;
+                arrDirs.forEach(dirPath => {
+                    if (firstLetter === dirPath.slice(-1)) fullName = path.join(dirPath, name);
+                });
+                return fullName;
+            });
+
+            myFS.mkdir(output)
+                .then(Promise.all(arrDirs.map(dir => myFS.mkdir(dir))))
+                .then(Promise.all(arrFiles.map((file, i) => myFS.link(file, fullNamesFiles[i]))))
+                .catch(e => console.error(e));
+        }
+    }
 };
 
 const deleteAnything = pathFor => {
     myFS.exists(pathFor)
-        .then(bigOperations.read)
+        .then(bigOperations.scan)
         .then(bigOperations.remove)
         .catch(e => console.error(e));
 
 };
 
 const copyDirectory = (input, output) => {
-    if (!checkDirOnExist(input)) return;
-    deleteExistDir(output);
+    myFS.unexists(output) // Если не существует папка с таких же названием, как у той, которую ходтим создать
+        .then(() => myFS.exists(input)) // И существует папки из которой копировать
+        .then(bigOperations.scan)
+        .then(bigOperations.copy(input, output))
+        .catch(e => console.error(e));
 
-    (function copy(input, output) {
-        fs.mkdirSync(output);
-        fs.readdir(input, (err, files) => {
-
-            if (err) return console.error('Ошибка чтения каталога');
-
-            files.forEach(file => {
-                let newInput = path.join(input, file);
-                let newOutput = path.join(output, file);
-
-                if (fs.statSync(newInput).isDirectory()) copy(newInput, newOutput);
-                else fs.link(newInput, newOutput, err => console.log(err ? err : `файл ${file} успешно скопирован!`));
-
-            })
-        });
-    })(input, output);
 };
 
 const distribute = (input, output, isDeleteInput = false) => {
-    if (!checkDirOnExist(input)) return;
-    deleteExistDir(output);
 
-    fs.mkdirSync(output);
-    console.log(`папка ${output} создана`);
+    // Доделать опциональное удаление исходной папки!
 
-    let count = 0; // 1. Создаем счетчик
-    let readCount = () => !--count && isDeleteInput && deleteAnything(input);
-    /* 4. Уменьшаем счетчик, как только он станет равен 0,
-    значит была завершена посленяя функция чтения.
-    И удаляем исходную папку, если это указано
-     */
-
-    (function read(input, output) {
-        ++count; // 2. Счетчик увеличивается с рекурсией
-
-        fs.readdir(input, (err, files) => {
-            if (err) return console.error(`Ошибка чтения каталога: ${err}`);
-
-            files.forEach(file => {
-                let newInput = path.join(input, file);
-
-                if (fs.statSync(newInput).isDirectory()) read(newInput, output);
-                else {
-                    let newOutput = path.join(output, file[0].toUpperCase());
-
-                    if (!fs.existsSync(newOutput)) fs.mkdirSync(newOutput);
-                    fs.linkSync(newInput, path.join(newOutput, file));
-                    console.log(`файл ${file} успешно создан`);
-                }
-
-            });
-
-            readCount(); // 3. Когда операции в директории завершены...
-        })
-    })(input, output);
-
+    myFS.unexists(output) // Если не существует папка с таких же названием, как у той, которую ходтим создать
+        .then(() => myFS.exists(input)) // И существует папки из которой копировать
+        .then(bigOperations.scan)
+        .then(bigOperations.distribute(input, output))
+        .catch(e => console.error(e));
 };
 
 // copyDirectory(path.join(__dirname, 'savedData'), path.join(__dirname, 'in'));
