@@ -69,7 +69,7 @@ const baseOperations = {
     },
 
     remove ({arrFiles, arrDirs}) {
-        return new Promise(((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             Promise
                 .all(arrFiles.map(files => myFS.unlink(files))) // Вначале удаляем все файлы
                 .then(() => {
@@ -88,7 +88,7 @@ const baseOperations = {
                             .catch(reject)
                     }
                 })
-        }));
+        });
     },
 
     copy (input, output) {
