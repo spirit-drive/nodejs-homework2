@@ -114,7 +114,7 @@ const baseOperations = {
     },
 
     distribute(input, output) {
-        return ({arrFiles}) => new Promise(((resolve, reject) => {
+        return ({arrFiles}) => new Promise((resolve, reject) => {
 
             /* Разбиваем каждый путь к файлу по сепаратору: file.split(path.sep)
             И берем имя файла с помощью slice(-1) получаем массив имен файлов */
@@ -139,7 +139,7 @@ const baseOperations = {
                 .then(resolve)
                 .catch(reject)
 
-        }));
+        });
     }
 };
 
