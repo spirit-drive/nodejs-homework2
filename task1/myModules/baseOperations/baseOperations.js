@@ -12,9 +12,9 @@ const baseOperations = {
 
             // Функция завершения, уменьшает счетчик, когда счетчик будет равен 0, значит все функции чтения завершены,
             // все пути записаны в массивы и можно эти пути передать дальше
-            const endRead = ({arrFiles, arrDirs}) => !--count && resolve({arrFiles, arrDirs});
+            const endRead = () => !--count && resolve({arrFiles, arrDirs});
 
-            let count = 0;
+            let count = 0; // Создаем счетчик
 
             // Первоначальная проверка, файл или папка?
             myFS.stat(pathFor)
@@ -25,6 +25,7 @@ const baseOperations = {
                     if (stats.isDirectory()) {
                         arrDirs.push(pathFor);
 
+                        // Самовызывающаяся рекурсивная функция
                         (function readInside (pathFor) {
 
                             ++count; // Увеличиваем счетчик
@@ -33,7 +34,7 @@ const baseOperations = {
 
                                     // Если папка не пуста
                                     files.length ?
-                                        // Бежим по ним и записываем в соответствующие массивы пути, прочитывая каждую папку
+                                        // Бежим по файлам и записываем в соответствующие массивы пути, прочитывая каждую папку
                                         files.forEach((file, i) => {
                                             let input = path.join(pathFor, file);
 
@@ -41,17 +42,17 @@ const baseOperations = {
                                                 .then(stats => {
                                                     if (stats.isDirectory()) {
                                                         arrDirs.push(input);
-                                                        readInside(input);
+                                                        readInside(input); // читаем папку
                                                     } else {
                                                         arrFiles.push(input);
                                                     }
                                                     // Когда дошли до последнего файла, вызываем функцию завершения
-                                                    i === files.length - 1 && endRead({arrFiles, arrDirs});
+                                                    i === files.length - 1 && endRead();
                                                 })
                                                 .catch(reject);
                                         }) :
                                         // Если папка пуста
-                                        endRead({arrFiles, arrDirs});
+                                        endRead();
 
                                 })
                                 .catch(reject);
@@ -61,7 +62,7 @@ const baseOperations = {
                     } else {
                         // Если указанный путь - файл, то добавляем его в массив путей к файлам и заверваем функцию
                         arrFiles.push(pathFor);
-                        endRead({arrFiles, arrDirs})
+                        endRead()
                     }
                 })
                 .catch(reject);
@@ -129,13 +130,15 @@ const baseOperations = {
             Превращаем Set в массив и сортируем его: [...*].sort() */
             let arrDirs = [...new Set(arrFiles.map((_, i) => path.join(output, firstLetters[i])))].sort();
 
+            // Сравниваем первый символ имени файла с названием папки: dirPath.slice(-1)
+            // Если они совпадают, то файл должен лежать в этой папке, записываем полный путь к файлу: return path.join(dirPath, name)
             let fullNamesFiles = namesFiles.map((name, i) => {
                 for (let dirPath of arrDirs) if (firstLetters[i] === dirPath.slice(-1)) return path.join(dirPath, name);
             });
 
-            myFS.mkdir(output)
-                .then(() => Promise.all(arrDirs.map(dir => myFS.mkdir(dir))))
-                .then(() => Promise.all(arrFiles.map((file, i) => myFS.link(file, fullNamesFiles[i]))))
+            myFS.mkdir(output) // Создаем корневую папку
+                .then(() => Promise.all(arrDirs.map(dir => myFS.mkdir(dir)))) // Все остальные папки, порядок не важен, потому что вложенность только первого уровня
+                .then(() => Promise.all(arrFiles.map((file, i) => myFS.link(file, fullNamesFiles[i])))) // Копируем все файлы
                 .then(resolve)
                 .catch(reject)
 
