@@ -21,18 +21,11 @@ const copyDirectory = (input, output) => {
 
 const distribute = (input, output, isDeleteInput = false) => {
 
-    // Для возможности удаления, без необходимости повтороного сканирования
-    let filesArr;
-    let dirsArr;
-
     myFS.unexists(output) // Если не существует папка с таких же названием, как у той, которую хотим создать...
         .then(() => myFS.exists(input)) // ... и существует папка из которой копировать, только тогда продолжаем
         .then(baseOperations.scan)
-        .then(({arrFiles, arrDirs}) => {
-            if (isDeleteInput) {filesArr = arrFiles; dirsArr = arrDirs}
-            return baseOperations.distribute(input, output)({arrFiles, arrDirs});
-        })
-        .then(() => isDeleteInput && baseOperations.remove({arrFiles: filesArr, arrDirs: dirsArr}))
+        .then(({arrFiles, arrDirs}) => baseOperations.distribute(input, output)({arrFiles, arrDirs}))
+        .then(({arrFiles, arrDirs}) => isDeleteInput && baseOperations.remove({arrFiles, arrDirs}))
         .catch(console.error);
 };
 

@@ -56,11 +56,7 @@ const myFS = {
     }),
 
     // сортирует по длинне. По логике самые глубокие директории, которые надо удалить, имеют самый длинный путь к файлу
-    ascendingSort: (a, b) => a.length < b.length ?
-        1 :
-        a.length > b.length ?
-            -1 :
-            0,
+    ascendingSort: (a, b) => b.length - a.length,
 
 };
 

@@ -79,13 +79,13 @@ const baseOperations = {
                     if (arrDirs.length) {
 
                         // сортирует по длинне. По логике самые глубокие директории, которые надо удалить, имеют самый длинный путь к файлу
-                        arrDirs = arrDirs.sort(myFS.ascendingSort);
+                        let _arrDirs = [...arrDirs].sort(myFS.ascendingSort);
 
                         // После чего последовательно удаляем каждую папку, начиная с самой глубокой
-                        let promisesDirs = myFS.rmdir(arrDirs[0]);
-                        arrDirs.forEach((dir, i) => {if (i) promisesDirs = promisesDirs.then(() => myFS.rmdir(dir))});
+                        let promisesDirs = myFS.rmdir(_arrDirs[0]);
+                        for (let i = 1; i < _arrDirs.length; ++i) promisesDirs = promisesDirs.then(() => myFS.rmdir(_arrDirs[i]))
                         promisesDirs
-                            .then(resolve)
+                            .then(() => resolve({arrFiles, arrDirs}))
                             .catch(reject)
                     }
                 })
@@ -99,23 +99,23 @@ const baseOperations = {
             let newFiles = arrFiles.map(file => file.replace(input, output));
 
             // Заменяем все пути папок на новые и сортируем так, чтобы первой в массиве была папка, в которой содержатся все остальные папки и файлы
-            arrDirs = arrDirs.map(dir => dir.replace(input, output)).sort(myFS.ascendingSort).reverse();
+            let _arrDirs = arrDirs.map(dir => dir.replace(input, output)).sort(myFS.ascendingSort).reverse();
 
             // Последовательно создаем каждую папку, начиная с корневой
-            let promisesDirs = myFS.mkdir(arrDirs[0]);
-            arrDirs.forEach((dir, i) => {if (i) promisesDirs = promisesDirs.then(() => myFS.mkdir(dir))});
+            let promisesDirs = myFS.mkdir(_arrDirs[0]);
+            for (let i = 1; i < _arrDirs.length; ++i) promisesDirs = promisesDirs.then(() => myFS.mkdir(_arrDirs[i]))
 
             // Когда все папки созданы, копируем все файлы, уже не важно в каком порядке
             promisesDirs
                 .then(() => Promise.all(arrFiles.map((files, i) => myFS.link(files, newFiles[i]))))
-                .then(resolve)
+                .then(() => resolve({arrFiles, arrDirs}))
                 .catch(reject)
 
         });
     },
 
     distribute(input, output) {
-        return ({arrFiles}) => new Promise((resolve, reject) => {
+        return ({arrFiles, arrDirs}) => new Promise((resolve, reject) => {
 
             /* Разбиваем каждый путь к файлу по сепаратору: file.split(path.sep)
             И берем имя файла с помощью slice(-1) получаем массив имен файлов */
@@ -128,18 +128,18 @@ const baseOperations = {
             и получаем массив путей новый папок: path.join(output, ...)
             Избавляемся от дубликатов: new Set(...)
             Превращаем Set в массив и сортируем его: [...*].sort() */
-            let arrDirs = [...new Set(arrFiles.map((_, i) => path.join(output, firstLetters[i])))].sort();
+            let _arrDirs = [...new Set(arrFiles.map((_, i) => path.join(output, firstLetters[i])))].sort();
 
             // Сравниваем первый символ имени файла с названием папки: dirPath.slice(-1)
             // Если они совпадают, то файл должен лежать в этой папке, записываем полный путь к файлу: return path.join(dirPath, name)
             let fullNamesFiles = namesFiles.map((name, i) => {
-                for (let dirPath of arrDirs) if (firstLetters[i] === dirPath.slice(-1)) return path.join(dirPath, name);
+                for (let dirPath of _arrDirs) if (firstLetters[i] === dirPath.slice(-1)) return path.join(dirPath, name);
             });
 
             myFS.mkdir(output) // Создаем корневую папку
-                .then(() => Promise.all(arrDirs.map(dir => myFS.mkdir(dir)))) // Все остальные папки, порядок не важен, потому что вложенность только первого уровня
+                .then(() => Promise.all(_arrDirs.map(dir => myFS.mkdir(dir)))) // Все остальные папки, порядок не важен, потому что вложенность только первого уровня
                 .then(() => Promise.all(arrFiles.map((file, i) => myFS.link(file, fullNamesFiles[i])))) // Копируем все файлы
-                .then(resolve)
+                .then(() => resolve({arrFiles, arrDirs}))
                 .catch(reject)
 
         });
