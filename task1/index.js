@@ -24,12 +24,12 @@ const distribute = (input, output, isDeleteInput = false) => {
     myFS.unexists(output) // Если не существует папка с таких же названием, как у той, которую хотим создать...
         .then(() => myFS.exists(input)) // ... и существует папка из которой копировать, только тогда продолжаем
         .then(baseOperations.scan)
-        .then(({arrFiles, arrDirs}) => baseOperations.distribute(input, output)({arrFiles, arrDirs}))
+        .then(baseOperations.distribute(input, output))
         .then(({arrFiles, arrDirs}) => isDeleteInput && baseOperations.remove({arrFiles, arrDirs}))
         .catch(console.error);
 };
 
-let [operation, input, output, isDeleteInput] = process.argv.slice(2);
+let [,,operation, input, output, isDeleteInput] = process.argv;
 
 if (!operation) return console.error(`Команда не распознана. Пожалуйста введите название операции "copy" или "distribute" или "delete" и передайте нужные параметры. operation ${operation}`);
 if (!input) return console.error(`Не объявленны необходимые переменные! input: ${input}`);
