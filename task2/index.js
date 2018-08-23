@@ -1,16 +1,16 @@
 const http = require('http');
-const port = 3000;
+const port = 3001;
 const getDateToUTC = () => (new Date).toUTCString();
 
-const [interval = 1000, timeout = 5000] = process.argv.slice(2);
+const {INTERVAL = 1000, TIMEOUT = 5000} = process.env;
 
 const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url !== '/favicon.ico') {
-        const intervalID = setInterval(() => console.log(getDateToUTC()), interval);
+        const intervalID = setInterval(() => console.log(getDateToUTC()), INTERVAL);
         setTimeout(() => {
             clearInterval(intervalID);
             res.end(getDateToUTC());
-        }, timeout)
+        }, TIMEOUT)
 
     }
 });

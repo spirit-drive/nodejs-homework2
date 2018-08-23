@@ -29,7 +29,7 @@ const distribute = (input, output, isDeleteInput = false) => {
         .catch(console.error);
 };
 
-let [,,operation, input, output, isDeleteInput] = process.argv;
+let [,, operation, input, output, isDeleteInput] = process.argv;
 
 if (!operation) return console.error(`Команда не распознана. Пожалуйста введите название операции "copy" или "distribute" или "delete" и передайте нужные параметры. operation ${operation}`);
 if (!input) return console.error(`Не объявленны необходимые переменные! input: ${input}`);

@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "set INTERVAL=1000 && set TIMEOUT=5000 && node ./task2/index.js"
   },
   "repository": {
     "type": "git",
